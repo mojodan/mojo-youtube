@@ -7,7 +7,6 @@ Usage: python download_video.py <YouTube_URL>
 """
 
 import sys
-import os
 from pathlib import Path
 import yt_dlp
 
