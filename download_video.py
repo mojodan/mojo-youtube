@@ -32,6 +32,7 @@ def download_youtube_video(url):
         'merge_output_format': 'mp4',  # Prefer mp4 format after merging
         'quiet': False,  # Show download progress
         'no_warnings': False,
+        'cookiefile': str(Path(__file__).parent / 'cookies.txt'),  # Use local cookies.txt
     }
     
     try:
@@ -42,6 +43,28 @@ def download_youtube_video(url):
             print("\nDownload completed successfully!")
             return True
     except Exception as e:
+        # If this is the _parse_browser_specification signature error, retry via CLI-style call
+        err_str = str(e)
+        if "_parse_browser_specification" in err_str:
+            print("Warning: cookies-from-browser parsing failed in this yt-dlp build. Retrying via CLI flag...")
+            try:
+                # Call yt-dlp CLI entrypoint with the cookies flag to avoid the parser mismatch.
+                # This returns an exit code: 0 on success.
+                exit_code = yt_dlp.main([
+                    '--cookies-from-browser', 'chrome',
+                    '--cookiefile', str(Path(__file__).parent / 'cookies.txt'),
+                    '--format', 'bestvideo+bestaudio/best',
+                    '--merge-output-format', 'mp4',
+                    '--no-warnings',
+                    '--output', str(downloads_dir / '%(title)s.%(ext)s'),
+                    url,
+                ])
+                if exit_code == 0:
+                    print("\nDownload completed successfully (CLI fallback)!")
+                    return True
+            except Exception:
+                pass
+
         print(f"\nError downloading video: {e}", file=sys.stderr)
         return False
 
