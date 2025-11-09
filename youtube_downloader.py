@@ -91,6 +91,17 @@ class YouTubeDownloader:
             'no_color': False,
         }
 
+        # Add cookies file if specified
+        cookies_file = self.config.get('cookies_file')
+        if cookies_file:
+            cookies_path = Path(cookies_file)
+            if cookies_path.exists():
+                options['cookiefile'] = str(cookies_path)
+                self.logger.info(f"Using cookies from: {cookies_path}")
+            else:
+                self.logger.warning(f"Cookies file not found: {cookies_path}")
+                print(f"{Fore.YELLOW}Warning: Cookies file not found: {cookies_path}")
+
         # Add subtitle options
         options.update(self.get_subtitle_options())
 
@@ -242,6 +253,7 @@ def load_config(config_file: Optional[str] = None) -> Dict:
         'download_thumbnail': False,
         'save_metadata': True,
         'skip_existing': True,
+        'cookies_file': None,
         'verbose': False,
         'quiet': False,
         'log_file': 'youtube_downloader.log'
@@ -270,6 +282,7 @@ Examples:
   %(prog)s -o ./videos -q 720p https://youtube.com/watch?v=VIDEO_ID
   %(prog)s -c config.yaml https://youtube.com/playlist?list=PLAYLIST_ID
   %(prog)s --quality best --subs en,es https://youtube.com/watch?v=VIDEO_ID
+  %(prog)s --cookies cookies.txt https://youtube.com/watch?v=VIDEO_ID
         """
     )
 
@@ -283,6 +296,7 @@ Examples:
                        choices=['srt', 'vtt', 'json3'],
                        help='Subtitle format (default: srt)')
     parser.add_argument('-c', '--config', help='Path to config file (YAML)')
+    parser.add_argument('--cookies', help='Path to cookies.txt file (Netscape format)')
     parser.add_argument('--organize', action='store_true',
                        help='Organize downloads by channel name')
     parser.add_argument('--thumbnail', action='store_true',
@@ -317,6 +331,8 @@ Examples:
         config['subtitle_languages'] = [lang.strip() for lang in args.subs.split(',')]
     if args.subtitle_format:
         config['subtitle_format'] = args.subtitle_format
+    if args.cookies:
+        config['cookies_file'] = args.cookies
     if args.organize:
         config['organize_by_channel'] = True
     if args.thumbnail:

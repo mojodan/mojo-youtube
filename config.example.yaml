@@ -20,6 +20,9 @@ subtitle_format: srt  # Options: srt, vtt, json3
 max_retries: 3  # Number of retry attempts for failed downloads
 skip_existing: true  # Skip downloading if file already exists
 
+# Authentication
+# cookies_file: cookies.txt  # Path to cookies.txt file (Netscape format) for accessing restricted content
+
 # File organization
 organize_by_channel: false  # Create subdirectories by channel name
 download_thumbnail: false  # Download video thumbnail image

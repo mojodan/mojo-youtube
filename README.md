@@ -16,6 +16,7 @@ A robust YouTube video downloader with automatic English subtitle extraction usi
 - Flexible configuration via CLI or config file
 - Organize downloads by channel
 - Download video metadata and thumbnails
+- Cookie support for accessing age-restricted and members-only content
 
 ## Installation
 
@@ -77,6 +78,7 @@ optional arguments:
                         Subtitle format (default: srt)
   -c CONFIG, --config CONFIG
                         Path to config file (YAML)
+  --cookies COOKIES     Path to cookies.txt file (Netscape format)
   --organize            Organize downloads by channel name
   --thumbnail           Download video thumbnail
   --no-metadata         Do not save metadata JSON file
@@ -127,6 +129,11 @@ python youtube_downloader.py --thumbnail --retry 5 "https://youtube.com/watch?v=
 python youtube_downloader.py -c config.yaml "https://youtube.com/watch?v=VIDEO_ID"
 ```
 
+#### Download age-restricted video with cookies
+```bash
+python youtube_downloader.py --cookies cookies.txt "https://youtube.com/watch?v=VIDEO_ID"
+```
+
 ## Configuration File
 
 For repeated use with consistent settings, create a configuration file:
@@ -161,6 +168,35 @@ The downloader implements intelligent subtitle handling:
 3. **Format**: Downloads in SRT format by default (most compatible)
 4. **Languages**: Defaults to English but supports multiple languages
 5. **Notification**: Reports which subtitle type was downloaded
+
+## Using Cookies for Restricted Content
+
+Some videos require authentication to access:
+- Age-restricted content
+- Members-only videos
+- Region-locked content
+- Private/unlisted videos requiring account access
+
+To download these videos, you need to provide browser cookies in Netscape format.
+
+### Exporting Cookies from Your Browser
+
+1. **Install a browser extension**:
+   - Chrome/Edge: [Get cookies.txt LOCALLY](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
+   - Firefox: [cookies.txt](https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/)
+
+2. **Export cookies**:
+   - Log in to YouTube in your browser
+   - Navigate to YouTube.com
+   - Click the extension icon
+   - Click "Export" to save as `cookies.txt`
+
+3. **Use cookies with the downloader**:
+```bash
+python youtube_downloader.py --cookies cookies.txt "https://youtube.com/watch?v=VIDEO_ID"
+```
+
+**Security Note**: Keep your `cookies.txt` file secure. It contains authentication tokens that grant access to your YouTube account. Never share or commit this file to version control (it's excluded in `.gitignore`).
 
 ## Quality Options
 
@@ -223,6 +259,12 @@ python youtube_downloader.py -v "https://youtube.com/watch?v=VIDEO_ID"
 - Verify the YouTube URL is accessible
 - Try updating yt-dlp: `pip install --upgrade yt-dlp`
 - Use `--retry` to increase retry attempts
+
+### Age-restricted or members-only video fails
+- Export fresh cookies from your browser (cookies expire)
+- Ensure you're logged in to YouTube when exporting cookies
+- Use the `--cookies` option with the path to your cookies.txt file
+- Verify the cookies.txt file is in Netscape format
 
 ### No subtitles downloaded
 - Not all videos have subtitles available
