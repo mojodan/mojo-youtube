@@ -25,14 +25,22 @@ def download_youtube_video(url):
     downloads_dir = Path(__file__).parent / "downloads"
     downloads_dir.mkdir(exist_ok=True)
     
-    # Configure yt-dlp options for highest quality
+    # Configure yt-dlp options for QuickTime-compatible output and subtitles
     ydl_opts = {
         'format': 'bestvideo+bestaudio/best',  # Download best video and audio, merge if possible
         'outtmpl': str(downloads_dir / '%(title)s.%(ext)s'),  # Output template
-        'merge_output_format': 'mp4',  # Prefer mp4 format after merging
+        'merge_output_format': 'mov',  # Produce QuickTime-compatible container
+        'recodevideo': 'mov',  # Re-encode to .mov if needed (requires ffmpeg)
         'quiet': False,  # Show download progress
         'no_warnings': False,
-        'cookiefile': str(Path(__file__).parent / 'cookies.txt'),  # Use local cookies.txt
+        # Subtitles: download available and automatic subtitles, save as SRT (external file)
+        'writesubtitles': True,
+        'writeautomaticsub': True,
+        'subtitlesformat': 'srt',
+        'subtitleslangs': ['en'],
+        'embedsubtitles': False,
+        # Use local cookies.txt
+        'cookiefile': str(Path(__file__).parent / 'cookies.txt'),
     }
     
     try:
@@ -48,13 +56,16 @@ def download_youtube_video(url):
         if "_parse_browser_specification" in err_str:
             print("Warning: cookies-from-browser parsing failed in this yt-dlp build. Retrying via CLI flag...")
             try:
-                # Call yt-dlp CLI entrypoint with the cookies flag to avoid the parser mismatch.
-                # This returns an exit code: 0 on success.
+                # Call yt-dlp CLI entrypoint with cookiefile and subtitle flags to avoid parser mismatch.
                 exit_code = yt_dlp.main([
-                    '--cookies-from-browser', 'chrome',
                     '--cookiefile', str(Path(__file__).parent / 'cookies.txt'),
                     '--format', 'bestvideo+bestaudio/best',
-                    '--merge-output-format', 'mp4',
+                    '--merge-output-format', 'mov',
+                    '--recode-video', 'mov',
+                    '--write-subs',
+                    '--write-auto-sub',
+                    '--sub-format', 'srt',
+                    '--sub-lang', 'en',
                     '--no-warnings',
                     '--output', str(downloads_dir / '%(title)s.%(ext)s'),
                     url,
