@@ -30,7 +30,7 @@ def download_youtube_video(url):
         'format': 'bestvideo+bestaudio/best',  # Download best video and audio, merge if possible
         'outtmpl': str(downloads_dir / '%(title)s.%(ext)s'),  # Output template
         'merge_output_format': 'mov',  # Produce QuickTime-compatible container
-        'recodevideo': 'mov',  # Re-encode to .mov if needed (requires ffmpeg)
+        'recode_video': 'mov',  # Re-encode to .mov if needed (requires ffmpeg)
         'quiet': False,  # Show download progress
         'no_warnings': False,
         # Subtitles: download available and automatic subtitles, save as SRT (external file)
@@ -40,7 +40,7 @@ def download_youtube_video(url):
         'subtitleslangs': ['en'],
         'embedsubtitles': False,
         # Use local cookies.txt
-        'cookiefile': str(Path(__file__).parent / 'cookies.txt'),
+        'cookiefile': str(Path(__file__).parent / 'cookies-viemo.txt'),
     }
     
     try:
@@ -58,7 +58,7 @@ def download_youtube_video(url):
             try:
                 # Call yt-dlp CLI entrypoint with cookiefile and subtitle flags to avoid parser mismatch.
                 exit_code = yt_dlp.main([
-                    '--cookiefile', str(Path(__file__).parent / 'cookies.txt'),
+                    '--cookiefile', str(Path(__file__).parent / 'cookies-viemo.txt'),
                     '--format', 'bestvideo+bestaudio/best',
                     '--merge-output-format', 'mov',
                     '--recode-video', 'mov',
