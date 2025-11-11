@@ -22,6 +22,14 @@ except ImportError as e:
     print("Please install dependencies: pip install -r requirements.txt")
     sys.exit(1)
 
+# Optional: Whisper for transcription
+WHISPER_AVAILABLE = False
+try:
+    from faster_whisper import WhisperModel
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WhisperModel = None
+
 # Initialize colorama for cross-platform color support
 init(autoreset=True)
 
@@ -169,6 +177,15 @@ class YouTubeDownloader:
                     self.report_subtitle_status(info)
 
                     print(f"{Fore.GREEN}Successfully downloaded: {info.get('title', 'video')}")
+
+                    # Transcribe video if enabled
+                    if self.config.get('transcribe', False):
+                        video_path = self.get_video_path(info)
+                        if video_path:
+                            self.transcribe_video(video_path, info)
+                        else:
+                            self.logger.warning("Could not find video file for transcription")
+
                     return True
 
             except yt_dlp.utils.DownloadError as e:
@@ -200,6 +217,126 @@ class YouTubeDownloader:
         for lang, sub_info in requested_subtitles.items():
             sub_type = "auto-generated" if sub_info.get('ext') == 'vtt' else "manual"
             print(f"{Fore.GREEN}Downloaded {lang} subtitles ({sub_type})")
+
+    def format_timestamp(self, seconds: float) -> str:
+        """Format seconds to SRT timestamp format (HH:MM:SS,mmm)"""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        millis = int((seconds % 1) * 1000)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+    def generate_srt(self, segments: List, output_path: Path) -> bool:
+        """Generate SRT subtitle file from Whisper segments"""
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                for i, segment in enumerate(segments, start=1):
+                    start_time = self.format_timestamp(segment.start)
+                    end_time = self.format_timestamp(segment.end)
+                    text = segment.text.strip()
+
+                    f.write(f"{i}\n")
+                    f.write(f"{start_time} --> {end_time}\n")
+                    f.write(f"{text}\n\n")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error generating SRT file: {e}")
+            return False
+
+    def transcribe_video(self, video_path: Path, info: Dict) -> bool:
+        """Transcribe video using Whisper and generate accurate English subtitles"""
+        if not WHISPER_AVAILABLE:
+            print(f"{Fore.YELLOW}Whisper not available. Install with: pip install faster-whisper")
+            self.logger.warning("Transcription skipped: faster-whisper not installed")
+            return False
+
+        if not video_path.exists():
+            self.logger.error(f"Video file not found: {video_path}")
+            return False
+
+        try:
+            # Determine subtitle output path
+            subtitle_path = video_path.with_suffix('.whisper.srt')
+
+            print(f"{Fore.CYAN}Starting transcription with Whisper...")
+            print(f"{Fore.CYAN}This may take a few minutes depending on video length...")
+
+            # Load Whisper model
+            model_size = self.config.get('whisper_model', 'base')
+            device = self.config.get('whisper_device', 'auto')
+            compute_type = self.config.get('whisper_compute_type', 'default')
+
+            # Map 'auto' and 'default' to appropriate values
+            if device == 'auto':
+                device = 'cuda' if self._cuda_available() else 'cpu'
+            if compute_type == 'default':
+                compute_type = 'float16' if device == 'cuda' else 'int8'
+
+            self.logger.info(f"Loading Whisper model: {model_size} on {device} with {compute_type}")
+            print(f"{Fore.CYAN}Loading Whisper model: {model_size}")
+
+            model = WhisperModel(model_size, device=device, compute_type=compute_type)
+
+            # Transcribe audio
+            self.logger.info(f"Transcribing: {video_path}")
+            segments, info_whisper = model.transcribe(
+                str(video_path),
+                language='en',
+                beam_size=5,
+                vad_filter=True,  # Voice activity detection
+                vad_parameters=dict(min_silence_duration_ms=500)
+            )
+
+            # Convert generator to list and generate SRT
+            segments_list = list(segments)
+
+            if not segments_list:
+                print(f"{Fore.YELLOW}No speech detected in video")
+                self.logger.warning("Transcription produced no segments")
+                return False
+
+            # Generate SRT file
+            if self.generate_srt(segments_list, subtitle_path):
+                print(f"{Fore.GREEN}Generated accurate English subtitles: {subtitle_path.name}")
+                self.logger.info(f"Transcription completed: {subtitle_path}")
+
+                # Log transcription details
+                duration = info_whisper.duration
+                num_segments = len(segments_list)
+                print(f"{Fore.GREEN}Transcribed {duration:.1f} seconds in {num_segments} segments")
+
+                return True
+            else:
+                return False
+
+        except Exception as e:
+            self.logger.error(f"Transcription error: {e}")
+            print(f"{Fore.RED}Transcription failed: {e}")
+            return False
+
+    def _cuda_available(self) -> bool:
+        """Check if CUDA is available for GPU acceleration"""
+        try:
+            import torch
+            return torch.cuda.is_available()
+        except ImportError:
+            return False
+
+    def get_video_path(self, info: Dict) -> Optional[Path]:
+        """Get the path to the downloaded video file"""
+        title = self.sanitize_filename(info.get('title', 'video'))
+        output_dir = Path(self.config.get('output_dir', './downloads'))
+
+        if self.config.get('organize_by_channel'):
+            output_dir = output_dir / info.get('uploader', 'unknown')
+
+        # Check for video file with common extensions
+        for ext in ['mp4', 'mkv', 'webm']:
+            video_path = output_dir / f"{title}.{ext}"
+            if video_path.exists():
+                return video_path
+
+        return None
 
     def download_playlist(self, url: str) -> bool:
         """Download all videos from a playlist"""
@@ -254,6 +391,10 @@ def load_config(config_file: Optional[str] = None) -> Dict:
         'save_metadata': True,
         'skip_existing': True,
         'cookies_file': None,
+        'transcribe': False,
+        'whisper_model': 'base',
+        'whisper_device': 'auto',
+        'whisper_compute_type': 'default',
         'verbose': False,
         'quiet': False,
         'log_file': 'youtube_downloader.log'
@@ -283,6 +424,8 @@ Examples:
   %(prog)s -c config.yaml https://youtube.com/playlist?list=PLAYLIST_ID
   %(prog)s --quality best --subs en,es https://youtube.com/watch?v=VIDEO_ID
   %(prog)s --cookies cookies.txt https://youtube.com/watch?v=VIDEO_ID
+  %(prog)s --transcribe https://youtube.com/watch?v=VIDEO_ID
+  %(prog)s --transcribe --whisper-model medium https://youtube.com/watch?v=VIDEO_ID
         """
     )
 
@@ -297,6 +440,11 @@ Examples:
                        help='Subtitle format (default: srt)')
     parser.add_argument('-c', '--config', help='Path to config file (YAML)')
     parser.add_argument('--cookies', help='Path to cookies.txt file (Netscape format)')
+    parser.add_argument('--transcribe', action='store_true',
+                       help='Generate accurate English subtitles using Whisper AI')
+    parser.add_argument('--whisper-model',
+                       choices=['tiny', 'base', 'small', 'medium', 'large'],
+                       help='Whisper model size (default: base). Larger = more accurate but slower')
     parser.add_argument('--organize', action='store_true',
                        help='Organize downloads by channel name')
     parser.add_argument('--thumbnail', action='store_true',
@@ -333,6 +481,10 @@ Examples:
         config['subtitle_format'] = args.subtitle_format
     if args.cookies:
         config['cookies_file'] = args.cookies
+    if args.transcribe:
+        config['transcribe'] = True
+    if args.whisper_model:
+        config['whisper_model'] = args.whisper_model
     if args.organize:
         config['organize_by_channel'] = True
     if args.thumbnail:

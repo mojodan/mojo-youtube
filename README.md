@@ -9,6 +9,11 @@ A robust YouTube video downloader with automatic English subtitle extraction usi
   - Prioritizes manual/community captions over auto-generated
   - Falls back to auto-generated subtitles when manual unavailable
   - Supports multiple subtitle languages
+- **AI-powered transcription** using OpenAI's Whisper for highly accurate English subtitles
+  - State-of-the-art speech recognition
+  - Multiple model sizes for speed/accuracy tradeoff
+  - GPU acceleration support
+  - Generates accurate timestamps and text
 - Smart retry logic with exponential backoff
 - Playlist and channel download support
 - Skip already downloaded videos
@@ -79,6 +84,9 @@ optional arguments:
   -c CONFIG, --config CONFIG
                         Path to config file (YAML)
   --cookies COOKIES     Path to cookies.txt file (Netscape format)
+  --transcribe          Generate accurate English subtitles using Whisper AI
+  --whisper-model {tiny,base,small,medium,large}
+                        Whisper model size (default: base). Larger = more accurate but slower
   --organize            Organize downloads by channel name
   --thumbnail           Download video thumbnail
   --no-metadata         Do not save metadata JSON file
@@ -134,6 +142,16 @@ python youtube_downloader.py -c config.yaml "https://youtube.com/watch?v=VIDEO_I
 python youtube_downloader.py --cookies cookies.txt "https://youtube.com/watch?v=VIDEO_ID"
 ```
 
+#### Generate AI transcription with Whisper
+```bash
+python youtube_downloader.py --transcribe "https://youtube.com/watch?v=VIDEO_ID"
+```
+
+#### Use larger Whisper model for maximum accuracy
+```bash
+python youtube_downloader.py --transcribe --whisper-model medium "https://youtube.com/watch?v=VIDEO_ID"
+```
+
 ## Configuration File
 
 For repeated use with consistent settings, create a configuration file:
@@ -168,6 +186,91 @@ The downloader implements intelligent subtitle handling:
 3. **Format**: Downloads in SRT format by default (most compatible)
 4. **Languages**: Defaults to English but supports multiple languages
 5. **Notification**: Reports which subtitle type was downloaded
+
+## AI-Powered Transcription with Whisper
+
+Generate highly accurate English subtitles using OpenAI's Whisper speech recognition model. This is ideal for:
+- Videos without existing subtitles
+- Improving accuracy of auto-generated captions
+- Creating professional-quality transcriptions
+- Podcasts and interviews with multiple speakers
+
+### How It Works
+
+The transcription feature:
+1. Downloads the video
+2. Extracts audio automatically
+3. Uses Whisper AI to transcribe speech to text
+4. Generates SRT subtitle file with accurate timestamps
+5. Saves as `[video_title].whisper.srt`
+
+### Whisper Model Sizes
+
+Choose the right model for your needs:
+
+| Model  | Size  | Speed       | Accuracy | Use Case |
+|--------|-------|-------------|----------|----------|
+| tiny   | 39M   | Very Fast   | Good     | Quick transcriptions, testing |
+| base   | 74M   | Fast        | Better   | Default, balanced performance |
+| small  | 244M  | Moderate    | Great    | High quality on CPU |
+| medium | 769M  | Slow        | Excellent| Professional transcriptions |
+| large  | 1550M | Very Slow   | Best     | Maximum accuracy needed |
+
+**Recommendation**: Use `base` for most cases, `medium` for professional work, `small` if you have time constraints.
+
+### GPU Acceleration
+
+Whisper can utilize NVIDIA GPUs for significant speed improvements:
+- **CPU**: 5-10x realtime (a 10-minute video takes 50-100 minutes)
+- **GPU**: 1-2x realtime (a 10-minute video takes 10-20 minutes)
+
+The downloader automatically detects and uses GPU if available (CUDA-enabled GPU + PyTorch with CUDA support).
+
+### Installation for Transcription
+
+Basic installation (CPU only):
+```bash
+pip install faster-whisper
+```
+
+For GPU acceleration (NVIDIA GPUs):
+```bash
+pip install faster-whisper torch --index-url https://download.pytorch.org/whl/cu118
+```
+
+### Usage Examples
+
+**Basic transcription:**
+```bash
+python youtube_downloader.py --transcribe "https://youtube.com/watch?v=VIDEO_ID"
+```
+
+**High-accuracy transcription:**
+```bash
+python youtube_downloader.py --transcribe --whisper-model medium "https://youtube.com/watch?v=VIDEO_ID"
+```
+
+**Enable in config file:**
+```yaml
+transcribe: true
+whisper_model: base
+whisper_device: auto  # Uses GPU if available
+```
+
+### Output Files
+
+When transcription is enabled, you'll get:
+- `video_title.mp4` - The video file
+- `video_title.en.srt` - YouTube's subtitles (if available)
+- `video_title.whisper.srt` - AI-generated transcription
+
+### Transcription Tips
+
+1. **Start with base model**: It provides good accuracy and reasonable speed
+2. **Use GPU if available**: 5-10x faster than CPU
+3. **Try medium for important content**: Noticeable accuracy improvement
+4. **Larger models need more RAM**: Ensure you have enough system memory
+5. **Processing time varies**: Depends on video length, model size, and hardware
 
 ## Using Cookies for Restricted Content
 
@@ -275,6 +378,13 @@ python youtube_downloader.py -v "https://youtube.com/watch?v=VIDEO_ID"
 - Ensure you have write permissions to the output directory
 - Try using a different output directory with `-o`
 
+### Transcription fails or is very slow
+- Install faster-whisper: `pip install faster-whisper`
+- For GPU acceleration: Install PyTorch with CUDA support
+- Start with a smaller model (tiny or base) to test
+- Check available RAM - larger models need more memory
+- Ensure video file downloaded successfully before transcription
+
 ### Import errors
 - Reinstall dependencies: `pip install -r requirements.txt`
 - Check Python version: `python --version` (requires 3.7+)
@@ -306,6 +416,7 @@ done < urls.txt
 - **tqdm**: Progress bar library
 - **pyyaml**: YAML configuration parser
 - **colorama**: Cross-platform colored terminal output
+- **faster-whisper**: (Optional) AI transcription using OpenAI's Whisper model
 
 ## License
 

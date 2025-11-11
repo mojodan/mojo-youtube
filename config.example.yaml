@@ -23,6 +23,12 @@ skip_existing: true  # Skip downloading if file already exists
 # Authentication
 # cookies_file: cookies.txt  # Path to cookies.txt file (Netscape format) for accessing restricted content
 
+# AI Transcription (generates highly accurate English subtitles)
+transcribe: false  # Enable Whisper AI transcription after download
+whisper_model: base  # Options: tiny, base, small, medium, large (larger = more accurate but slower)
+whisper_device: auto  # Options: auto, cpu, cuda (auto detects GPU if available)
+whisper_compute_type: default  # Options: default, int8, float16, float32
+
 # File organization
 organize_by_channel: false  # Create subdirectories by channel name
 download_thumbnail: false  # Download video thumbnail image
